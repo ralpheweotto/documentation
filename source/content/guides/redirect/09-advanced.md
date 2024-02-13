@@ -340,16 +340,25 @@ if (isset($_SERVER['PANTHEON_ENVIRONMENT']) && (php_sapi_name() !== 'cli') && !i
 The following example restricts access to `/user/`, `/admin/`, and `/node/` based on the IP addresses listed in the `$trusted_ips` array:
 
 ```php:title=settings.php
-function ip_in_list($ips) {
+function ip_in_list($arr_ip_range) {
+    // $range is in IP/CIDR format eg 127.0.0.1/24
     foreach(explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']) as $check_ip) {
-        foreach($ips as $ip) {
-          if(FALSE !== strpos($check_ip, $ip)) {
-            return true;
-          }
+        foreach($arr_ip_range as $ip_range) {
+            if ( strpos( $ip_range, '/' ) === false ) {
+                $ip_range .= '/32';
+            }
+            list( $ip_range, $netmask ) = explode( '/', $ip_range, 2 );
+            $range_decimal = ip2long( $ip_range );
+            $ip_decimal = ip2long( $check_ip );
+            $wildcard_decimal = pow( 2, ( 32 - $netmask ) ) - 1;
+            $netmask_decimal = ~ $wildcard_decimal;
+            if (( $ip_decimal & $netmask_decimal ) == ( $range_decimal & $netmask_decimal )) {
+                return true;
+            }
         }
     }
     return false;
-  }
+}
 
   function is_from_trusted_ip() {
     //Replace the IPs in this array with those you want to restrict access to
